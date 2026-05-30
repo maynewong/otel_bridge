@@ -1,9 +1,24 @@
 defmodule OtelBridge.Profile do
   @moduledoc """
-  Behaviour and helpers for backend-specific metric export profiles.
+  Defines backend-specific metric reader configuration for `OtelBridge`.
 
-  A profile turns high-level backend intent into a metric reader configuration
-  suitable for `:opentelemetry_experimental`.
+  `OtelBridge.Profile` exists so application metric definitions can stay
+  backend-agnostic.
+
+  A profile takes a backend choice such as VictoriaMetrics and turns it into
+  the metric reader configuration expected by `:opentelemetry_experimental`.
+  This keeps export details out of business modules and out of most call sites.
+
+  ## When you need this module
+
+  Use a profile when:
+
+    * you want a named helper such as `:victoria_metrics`
+    * you want a reusable module that builds a metric reader map
+    * you want backend-specific defaults to live in one place
+
+  If you do not need a profile abstraction, you can configure the
+  OpenTelemetry SDK directly and use `otel_bridge` only for metrics bridging.
 
   ## Example
 

@@ -1,7 +1,7 @@
 defmodule OtelBridge.MixProject do
   use Mix.Project
 
-  @version "0.1.1"
+  @version "0.1.2"
   @description "Bridge Telemetry.Metrics definitions into OpenTelemetry metrics"
   @source_url "https://github.com/maynewong/otel_bridge"
 
@@ -43,7 +43,6 @@ defmodule OtelBridge.MixProject do
       source_ref: "v#{@version}",
       source_url: @source_url,
       extras: ["README.md", "CHANGELOG.md", "LICENSE"],
-      nest_modules_by_prefix: [OtelBridge],
       groups_for_modules: [
         "Public API": [OtelBridge, OtelBridge.Spec, OtelBridge.Profile],
         Profiles: [OtelBridge.Profile.VictoriaMetrics],

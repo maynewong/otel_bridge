@@ -1,11 +1,11 @@
 defmodule OtelBridge.Spec do
   @moduledoc """
-  Behaviour for metric specification modules consumed by `OtelBridge`.
+  Defines the modules that declare application metrics for `OtelBridge`.
 
-  A spec module defines metric metadata in plain `Telemetry.Metrics` terms while
-  leaving OpenTelemetry instrument creation and backend policy to the bridge.
+  A spec module declares metrics in plain `Telemetry.Metrics` terms while
+  leaving OpenTelemetry runtime concerns to `OtelBridge`.
 
-  ## Example
+  ## A minimal example
 
       defmodule MyApp.Metrics do
         use OtelBridge.Spec
@@ -25,6 +25,18 @@ defmodule OtelBridge.Spec do
           ]
         end
       end
+
+  Pass modules like this to `OtelBridge` through the `:specs` option.
+
+  ## About `meta`
+
+  The `meta` argument is provided by the `:meta` option passed to `OtelBridge`.
+  Use it for values that should be shared across metric definitions, such as:
+
+    * service name
+    * environment name
+    * static tags
+    * reusable defaults
   """
 
   @doc """

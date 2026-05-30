@@ -5,6 +5,19 @@ All notable changes to this project will be documented in this file.
 The format is based on Keep a Changelog and the project follows Semantic
 Versioning.
 
+## [0.1.2] - 2026-05-30
+
+### Changed
+
+- rewrote the README and primary module docs to introduce the library from
+  problem statement through integration flow
+- added a lightweight architecture diagram and explicit metric mapping
+  reference for the Telemetry-to-OpenTelemetry bridge
+- improved module reference docs for `OtelBridge`, specs, profiles, and runtime
+  internals with more consistent wording and onboarding guidance
+- simplified ExDoc navigation by showing full module names instead of nested
+  prefix shorthands
+
 ## [0.1.1] - 2026-05-30
 
 ### Changed

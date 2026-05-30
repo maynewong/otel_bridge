@@ -1,10 +1,10 @@
 defmodule OtelBridge.Application do
   @moduledoc """
-  OTP application definition for `otel_bridge`.
+  OTP application module for `otel_bridge`.
 
-  The library itself does not need a long-running supervision tree at
-  application boot, but it declares its runtime application requirements here
-  so consumers get a working environment out of the box.
+  It exists so the library and its runtime dependencies are started correctly
+  when used as an application dependency. Applications should use `OtelBridge`
+  as the public integration entrypoint.
   """
 
   use Application

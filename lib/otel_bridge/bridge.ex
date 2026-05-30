@@ -1,11 +1,16 @@
 defmodule OtelBridge.Bridge do
   @moduledoc """
-  Runtime bridge from `Telemetry.Metrics` definitions to OpenTelemetry
-  instruments.
+  Runtime process that records telemetry events as OpenTelemetry metrics.
 
   Most applications should use `OtelBridge` instead of starting this module
-  directly. It is documented because it forms part of the library's runtime
-  architecture and may be useful when debugging or extending integrations.
+  directly.
+
+  This module:
+
+    1. receives prepared `Telemetry.Metrics` definitions
+    2. creates matching OpenTelemetry instruments
+    3. attaches telemetry handlers for each event name
+    4. records incoming measurements into those instruments
   """
 
   use GenServer
@@ -65,6 +70,13 @@ defmodule OtelBridge.Bridge do
   @doc """
   Telemetry event handler that records measurements into OpenTelemetry
   instruments.
+
+  For each configured metric, the handler:
+
+    * checks whether the metric should be kept for the current metadata
+    * extracts the measurement value
+    * derives the exported tags
+    * records the value into the created instrument
   """
   def handle_event(_event_name, measurements, metadata, %{metrics: metrics}) do
     ctx = OpenTelemetry.Ctx.get_current()

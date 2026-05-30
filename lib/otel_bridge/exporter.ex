@@ -2,8 +2,15 @@ defmodule OtelBridge.Exporter do
   @moduledoc """
   OTLP metrics exporter used by `OtelBridge` profiles.
 
-  This module focuses on metrics export wiring and environment merging. Most
-  callers should access it indirectly via `OtelBridge.Profile` helpers.
+  This module centralizes exporter initialization, transport handling, and
+  shutdown logic for profile-defined metric readers.
+
+  It is responsible for:
+
+    * combining explicit exporter options with standard OTLP environment variables
+    * initializing the underlying OTLP exporter state
+    * exporting metric payloads over HTTP protobuf or gRPC
+    * shutting down exporter-owned resources
   """
 
   require Logger

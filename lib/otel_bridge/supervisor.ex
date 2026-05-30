@@ -1,9 +1,14 @@
 defmodule OtelBridge.Supervisor do
   @moduledoc """
-  Supervisor that wires metric specs, bridge runtime, and poller processes
-  together.
+  Internal supervisor that assembles the `otel_bridge` runtime.
 
-  Most applications should start `OtelBridge` rather than this module directly.
+  Applications typically start `OtelBridge` instead of this module directly.
+
+  It coordinates:
+
+    1. metric definitions loaded from specs or raw metric lists
+    2. the `OtelBridge.Bridge` process that attaches telemetry handlers
+    3. the `:telemetry_poller` process for periodic measurements
   """
 
   use Supervisor
@@ -36,6 +41,10 @@ defmodule OtelBridge.Supervisor do
   @doc """
   Filters out metric shapes that the bridge intentionally leaves to observable
   instruments or custom handling.
+
+  For example, `Telemetry.Metrics.LastValue` is excluded from the default
+  runtime path because it usually needs observer-style behavior rather than the
+  synchronous event-to-instrument flow used by this bridge.
   """
   def prepare_metrics(metrics) do
     Enum.reject(metrics, &match?(%Telemetry.Metrics.LastValue{}, &1))

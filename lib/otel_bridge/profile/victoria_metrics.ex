@@ -1,10 +1,27 @@
 defmodule OtelBridge.Profile.VictoriaMetrics do
   @moduledoc """
-  VictoriaMetrics-oriented metric reader profile.
+  Built-in export profile for VictoriaMetrics.
 
-  This profile keeps synchronous counters and histograms cumulative because
-  that shape is commonly easier to consume in VictoriaMetrics and
-  Prometheus-style queries.
+  Use this profile when you want `otel_bridge` to emit metrics through an OTLP
+  metric reader configured for VictoriaMetrics-compatible workflows.
+
+  This profile configures cumulative temporality for synchronous counters and
+  histograms to align with VictoriaMetrics and Prometheus-style query
+  expectations.
+
+  ## Typical usage
+
+      config :opentelemetry_experimental,
+        readers: [
+          OtelBridge.metric_reader!(:victoria_metrics,
+            export_interval_ms: 5_000,
+            endpoint: "http://localhost:4318"
+          )
+        ]
+
+  If you need different backend behavior, create another
+  `OtelBridge.Profile` implementation instead of changing business metric
+  definitions.
   """
 
   @behaviour OtelBridge.Profile

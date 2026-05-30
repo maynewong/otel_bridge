@@ -1,15 +1,87 @@
 # OtelBridge
 
-`otel_bridge` is a small adapter layer for teams that already describe metrics
-with `Telemetry.Metrics`, but want to export them through OpenTelemetry.
+`otel_bridge` bridges existing `Telemetry.Metrics` definitions to
+OpenTelemetry metrics.
 
-It does not try to replace `opentelemetry`, `opentelemetry_api`, or
-`opentelemetry_exporter`. Instead, it sits on top of them and provides:
+If your application already emits telemetry events and already describes
+metrics with `Telemetry.Metrics`, this library provides a translation layer
+that exports those metrics through the OpenTelemetry SDK.
 
-- a small public API
-- a behaviour for metric spec modules
-- a bridge from `Telemetry.Metrics` to OpenTelemetry instruments
-- backend-specific profile helpers such as VictoriaMetrics
+It does not replace the OpenTelemetry SDK. It focuses on a single
+responsibility:
+
+- keep metric definitions in plain `Telemetry.Metrics`
+- translate supported metric shapes into OpenTelemetry instruments
+- provide small profile helpers for backend-specific reader configuration
+
+## What problem does it solve?
+
+Many Elixir applications already have useful `Telemetry.Metrics` modules, but
+modern observability pipelines often expect OpenTelemetry export.
+
+Without `otel_bridge`, teams typically have to choose between:
+
+- rewriting metric definitions in a new abstraction
+- duplicating metric definitions in two places
+- mixing backend-specific exporter policy into business code
+
+`otel_bridge` avoids that by separating the problem into three parts:
+
+1. your app keeps defining metrics in `Telemetry.Metrics`
+2. `OtelBridge` turns those definitions into OpenTelemetry instruments
+3. `OtelBridge.Profile` modules hold backend-specific export policy
+
+## How it works
+
+Most integrations follow the same flow:
+
+1. define one or more spec modules with `use OtelBridge.Spec`
+2. start `OtelBridge` under your supervision tree
+3. configure an OpenTelemetry metric reader, optionally via a profile helper
+
+```text
+MyApp.Metrics (OtelBridge.Spec)
+           |
+           v
+       OtelBridge
+     /           \
+    v             v
+Telemetry handlers  telemetry_poller
+           \       /
+            v     v
+   OpenTelemetry metrics
+            |
+            v
+   OtelBridge.Profile
+            |
+            v
+      OTLP backend
+```
+
+## What the bridge maps
+
+`otel_bridge` does not invent a second metrics DSL. It takes the
+`Telemetry.Metrics` definitions you already have and maps them into
+OpenTelemetry instruments at runtime.
+
+The default bridge path maps:
+
+- `Telemetry.Metrics.Counter` -> OpenTelemetry counter
+- `Telemetry.Metrics.Sum` -> OpenTelemetry counter
+- `Telemetry.Metrics.Summary` -> OpenTelemetry histogram
+- `Telemetry.Metrics.Distribution` -> OpenTelemetry histogram
+
+During that mapping, the bridge also:
+
+- groups metrics by telemetry event name
+- extracts measurements from event payloads
+- applies `keep` filters when present
+- derives exported tags from `tag_values`
+- carries over unit, description, and explicit OTel reporter options
+
+`Telemetry.Metrics.LastValue` is intentionally not mapped through the default
+event-driven path. If you need that shape, use observer-style runtime logic or
+custom observer children.
 
 ## Installation
 
@@ -18,7 +90,7 @@ Add `otel_bridge` to your dependencies:
 ```elixir
 def deps do
   [
-    {:otel_bridge, "~> 0.1.0"}
+    {:otel_bridge, "~> 0.1.2"}
   ]
 end
 ```
@@ -30,13 +102,9 @@ end
 - keep backend policy out of business modules
 - stay compatible with standard OpenTelemetry packages
 
-## Supported scope
+## Supported metrics and scope
 
-`otel_bridge` currently focuses on one job:
-
-- bridge `Telemetry.Metrics` definitions into OpenTelemetry metrics
-
-What it supports today:
+Supported today:
 
 - `Telemetry.Metrics.Counter`
 - `Telemetry.Metrics.Sum`
@@ -45,16 +113,16 @@ What it supports today:
 - backend policy helpers through `OtelBridge.Profile`
 - `:victoria_metrics` profile
 
-What it does not support today:
+Out of scope:
 
 - tracing APIs
 - logs
 - automatic dashboard generation
 - synchronous support for `Telemetry.Metrics.LastValue`
 
-## Define metrics
+## Step 1: define metrics
 
-Create a module that uses `OtelBridge.Spec` and returns ordinary
+Start by writing a spec module with `OtelBridge.Spec` that returns ordinary
 `Telemetry.Metrics` definitions:
 
 ```elixir
@@ -81,7 +149,11 @@ defmodule MyApp.Metrics do
 end
 ```
 
-## Start the bridge
+The `meta` argument comes from the `:meta` option you pass to `OtelBridge`.
+Use it for shared values such as service name, default tags, or deployment
+metadata.
+
+## Step 2: start the bridge
 
 Use `OtelBridge` directly in your supervision tree:
 
@@ -96,6 +168,13 @@ children = [
 ]
 ```
 
+At startup, `OtelBridge`:
+
+1. loads metrics from `:metrics`, `:specs`, and `:optional_specs`
+2. filters out metric shapes the default runtime does not support
+3. starts a telemetry bridge process for event-driven metrics
+4. starts `:telemetry_poller` for periodic measurements
+
 Accepted options:
 
 - `:metrics` - raw `Telemetry.Metrics` definitions
@@ -106,10 +185,10 @@ Accepted options:
 - `:poller` - `:telemetry_poller` options
 - `:observer_children` - custom observer children for gauge-like metrics
 
-## Configure metric export
+## Step 3: configure metric export
 
-`otel_bridge` does not own the whole OpenTelemetry SDK configuration. It only
-helps you build metric reader config for a chosen backend profile.
+`otel_bridge` does not own the full OpenTelemetry SDK configuration. It helps
+build metric reader configuration for a chosen backend profile.
 
 For VictoriaMetrics:
 
@@ -130,6 +209,9 @@ temporality for:
 - `histogram`
 - `updown_counter`
 
+You can also configure the OpenTelemetry SDK directly and use `otel_bridge`
+only for metrics bridging.
+
 ## Complete examples
 
 See the runnable examples in:
@@ -140,6 +222,15 @@ See the runnable examples in:
 The first shows the smallest business integration shape.
 The second shows how to wire the VictoriaMetrics profile into
 `config/runtime.exs`.
+
+## Where to look next
+
+Once the basic flow makes sense, these modules are the most useful references:
+
+- `OtelBridge` - the main integration entrypoint
+- `OtelBridge.Spec` - how to define metrics
+- `OtelBridge.Profile` - how export profiles work
+- `OtelBridge.Profile.VictoriaMetrics` - the built-in backend profile
 
 ## Contract guarantees
 
@@ -170,16 +261,4 @@ as internal and may change between minor releases.
 
 See [`CHANGELOG.md`](./CHANGELOG.md) for release history.
 
-## Scope
-
-`otel_bridge` is intentionally focused on metrics bridging and export policy.
-
-It does not:
-
-- replace `OpenTelemetry.Tracer`
-- replace the OpenTelemetry SDK
-- provide business-specific metric definitions
-
-Use the standard OpenTelemetry packages for tracing APIs and SDK setup, and use
-`otel_bridge` where you need a clean `Telemetry.Metrics` to OTel migration path.
 
