@@ -1,8 +1,9 @@
 defmodule OtelBridge.MixProject do
   use Mix.Project
 
-  @version "0.1.0"
+  @version "0.1.1"
   @description "Bridge Telemetry.Metrics definitions into OpenTelemetry metrics"
+  @source_url "https://github.com/maynewong/otel_bridge"
 
   def project do
     [
@@ -31,7 +32,8 @@ defmodule OtelBridge.MixProject do
       {:opentelemetry, "~> 1.7"},
       {:opentelemetry_exporter, "~> 1.10"},
       {:opentelemetry_api_experimental, "~> 0.5"},
-      {:opentelemetry_experimental, "~> 0.5"}
+      {:opentelemetry_experimental, "~> 0.5"},
+      {:ex_doc, ">= 0.0.0", only: :dev, runtime: false}
     ]
   end
 
@@ -39,13 +41,27 @@ defmodule OtelBridge.MixProject do
     [
       main: "readme",
       source_ref: "v#{@version}",
-      extras: ["README.md", "CHANGELOG.md", "LICENSE"]
+      source_url: @source_url,
+      extras: ["README.md", "CHANGELOG.md", "LICENSE"],
+      nest_modules_by_prefix: [OtelBridge],
+      groups_for_modules: [
+        "Public API": [OtelBridge, OtelBridge.Spec, OtelBridge.Profile],
+        Profiles: [OtelBridge.Profile.VictoriaMetrics],
+        Runtime: [
+          OtelBridge.Application,
+          OtelBridge.Supervisor,
+          OtelBridge.Bridge,
+          OtelBridge.Exporter
+        ]
+      ]
     ]
   end
 
   defp package do
     [
       licenses: ["Apache-2.0"],
+      maintainers: ["maynewong"],
+      links: %{"GitHub" => @source_url},
       files: ["lib", "mix.exs", "README.md", "CHANGELOG.md", "LICENSE", "examples"]
     ]
   end

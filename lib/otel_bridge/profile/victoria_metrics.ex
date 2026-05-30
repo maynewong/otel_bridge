@@ -1,5 +1,11 @@
 defmodule OtelBridge.Profile.VictoriaMetrics do
-  @moduledoc false
+  @moduledoc """
+  VictoriaMetrics-oriented metric reader profile.
+
+  This profile keeps synchronous counters and histograms cumulative because
+  that shape is commonly easier to consume in VictoriaMetrics and
+  Prometheus-style queries.
+  """
 
   @behaviour OtelBridge.Profile
 
@@ -10,6 +16,18 @@ defmodule OtelBridge.Profile.VictoriaMetrics do
   }
 
   @impl OtelBridge.Profile
+  @doc """
+  Builds an `:otel_metric_reader` configuration for VictoriaMetrics.
+
+  Required options:
+
+    * `:export_interval_ms`
+    * `:endpoint`
+
+  Optional options:
+
+    * `:protocol` - defaults to `:http_protobuf`
+  """
   def metric_reader(opts) do
     export_interval_ms = Keyword.fetch!(opts, :export_interval_ms)
     endpoint = Keyword.fetch!(opts, :endpoint)
@@ -30,5 +48,8 @@ defmodule OtelBridge.Profile.VictoriaMetrics do
     }
   end
 
+  @doc """
+  Returns the synchronous temporality defaults used by this profile.
+  """
   def default_temporality_mapping, do: @default_temporality_mapping
 end

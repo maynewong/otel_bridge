@@ -1,9 +1,19 @@
 defmodule OtelBridge.Bridge do
-  @moduledoc false
+  @moduledoc """
+  Runtime bridge from `Telemetry.Metrics` definitions to OpenTelemetry
+  instruments.
+
+  Most applications should use `OtelBridge` instead of starting this module
+  directly. It is documented because it forms part of the library's runtime
+  architecture and may be useful when debugging or extending integrations.
+  """
 
   use GenServer
   require Logger
 
+  @doc """
+  Starts the bridge process for a set of metric definitions.
+  """
   def start_link(opts) do
     name = Keyword.get(opts, :name, __MODULE__)
 
@@ -52,6 +62,10 @@ defmodule OtelBridge.Bridge do
     Enum.each(handlers, &:telemetry.detach/1)
   end
 
+  @doc """
+  Telemetry event handler that records measurements into OpenTelemetry
+  instruments.
+  """
   def handle_event(_event_name, measurements, metadata, %{metrics: metrics}) do
     ctx = OpenTelemetry.Ctx.get_current()
 

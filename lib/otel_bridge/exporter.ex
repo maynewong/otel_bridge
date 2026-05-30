@@ -1,16 +1,28 @@
 defmodule OtelBridge.Exporter do
-  @moduledoc false
+  @moduledoc """
+  OTLP metrics exporter used by `OtelBridge` profiles.
+
+  This module focuses on metrics export wiring and environment merging. Most
+  callers should access it indirectly via `OtelBridge.Profile` helpers.
+  """
 
   require Logger
 
   @default_metrics_path "/v1/metrics"
 
+  @doc """
+  Initializes exporter state from explicit options plus standard OTLP
+  environment variables.
+  """
   def init(opts) do
     opts
     |> merge_with_environment()
     |> :otel_exporter_otlp.init()
   end
 
+  @doc """
+  Exports metric payloads through the configured OTLP transport.
+  """
   def export(:metrics, metrics, resource, state), do: export(metrics, resource, state)
   def export(_kind, _data, _resource, _state), do: :ok
 
@@ -48,6 +60,9 @@ defmodule OtelBridge.Exporter do
 
   def export(_metrics, _resource, _state), do: {:error, :unsupported_protocol}
 
+  @doc """
+  Shuts down any exporter-owned network resources.
+  """
   def shutdown(%{channel_pid: nil}), do: :ok
 
   def shutdown(%{channel_pid: pid}) when is_pid(pid) do

@@ -1,8 +1,16 @@
 defmodule OtelBridge.Supervisor do
-  @moduledoc false
+  @moduledoc """
+  Supervisor that wires metric specs, bridge runtime, and poller processes
+  together.
+
+  Most applications should start `OtelBridge` rather than this module directly.
+  """
 
   use Supervisor
 
+  @doc """
+  Starts the bridge supervisor.
+  """
   def start_link(opts) do
     Supervisor.start_link(__MODULE__, opts)
   end
@@ -25,6 +33,10 @@ defmodule OtelBridge.Supervisor do
     Supervisor.init(children, strategy: :one_for_one)
   end
 
+  @doc """
+  Filters out metric shapes that the bridge intentionally leaves to observable
+  instruments or custom handling.
+  """
   def prepare_metrics(metrics) do
     Enum.reject(metrics, &match?(%Telemetry.Metrics.LastValue{}, &1))
   end
