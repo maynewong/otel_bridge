@@ -39,15 +39,14 @@ defmodule OtelBridge.Supervisor do
   end
 
   @doc """
-  Filters out metric shapes that the bridge intentionally leaves to observable
-  instruments or custom handling.
+  Prepares metric definitions for the bridge runtime.
 
-  For example, `Telemetry.Metrics.LastValue` is excluded from the default
-  runtime path because it usually needs observer-style behavior rather than the
-  synchronous event-to-instrument flow used by this bridge.
+  All currently supported shapes are kept, including
+  `Telemetry.Metrics.LastValue`, which is translated through an observable
+  gauge path in `OtelBridge.Bridge`.
   """
   def prepare_metrics(metrics) do
-    Enum.reject(metrics, &match?(%Telemetry.Metrics.LastValue{}, &1))
+    metrics
   end
 
   defp load_metrics(opts, metrics_config) do

@@ -24,15 +24,39 @@ defmodule ExampleApp.Metrics do
           |> Map.put(:route, metadata[:route] || "unknown")
           |> Map.put(:status_code, metadata[:status_code] || 500)
         end
+      ),
+      last_value("example.queue.depth",
+        event_name: [:example_app, :queue, :stats],
+        measurement: :depth,
+        tags: [:queue],
+        reporter_options: [
+          otel: [
+            last_value: [
+              ttl_ms: 300_000,
+              max_series: 100,
+              on_overflow: :drop_new
+            ]
+          ]
+        ]
       )
     ]
+  end
+end
+
+defmodule ExampleApp.Measurements do
+  def dispatch_queue_depth do
+    :telemetry.execute(
+      [:example_app, :queue, :stats],
+      %{depth: 42},
+      %{queue: "default"}
+    )
   end
 end
 
 children = [
   {OtelBridge,
    specs: [ExampleApp.Metrics],
-   measurements: [],
+   measurements: [{ExampleApp.Measurements, :dispatch_queue_depth, []}],
    meta: [service: "example_app"],
    poller: [period: 5_000]}
 ]

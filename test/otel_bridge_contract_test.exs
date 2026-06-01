@@ -64,12 +64,13 @@ defmodule OtelBridge.ContractTest do
              )
   end
 
-  test "last_value metrics stay outside the bridge contract" do
+  test "last_value metrics stay inside the bridge contract" do
     metrics = [
       last_value("contract.last_value", event_name: [:otel_bridge, :contract, :last_value]),
       counter("contract.count", event_name: [:otel_bridge, :contract, :last_value])
     ]
 
-    assert [%Telemetry.Metrics.Counter{}] = OtelBridge.prepare_metrics(metrics)
+    assert [%Telemetry.Metrics.LastValue{}, %Telemetry.Metrics.Counter{}] =
+             OtelBridge.prepare_metrics(metrics)
   end
 end

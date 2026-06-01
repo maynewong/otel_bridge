@@ -147,6 +147,7 @@ The default bridge path maps:
 - `Telemetry.Metrics.Sum` -> OpenTelemetry counter
 - `Telemetry.Metrics.Summary` -> OpenTelemetry histogram
 - `Telemetry.Metrics.Distribution` -> OpenTelemetry histogram
+- `Telemetry.Metrics.LastValue` -> OpenTelemetry observable gauge
 
 During that process, the bridge also:
 
@@ -156,9 +157,49 @@ During that process, the bridge also:
 - derives exported tags from `tag_values`
 - carries over unit, description, and explicit OTel reporter options
 
-`Telemetry.Metrics.LastValue` is intentionally not mapped through the default
-event-driven path. If you need that shape, use observer-style runtime logic or
-custom observer children.
+`Telemetry.Metrics.LastValue` is handled differently from synchronous metrics.
+Telemetry events update an internal latest-value store, and the OpenTelemetry
+reader observes that store through an observable gauge callback during
+collection. This preserves the current-state semantics of gauges without
+treating absolute values as counter deltas.
+
+### `last_value` cardinality protection
+
+Each `last_value` series is keyed by `{metric_name, tags}`. Low-cardinality
+gauges such as VM memory, queue depth, or cache size are a natural fit. Avoid
+high-cardinality tags such as request IDs, user IDs, or raw dynamic URLs unless
+you configure bounds.
+
+Use `reporter_options[:otel][:last_value]` to cap retained series:
+
+```elixir
+last_value("queue.depth",
+  event_name: [:my_app, :queue, :stats],
+  measurement: :depth,
+  tags: [:queue],
+  reporter_options: [
+    otel: [
+      last_value: [
+        ttl_ms: 300_000,
+        max_series: 1_000,
+        on_overflow: :drop_new
+      ]
+    ]
+  ]
+)
+```
+
+Supported options:
+
+- `:ttl_ms` - deletes stale series after the given age in milliseconds;
+  defaults to `:infinity`
+- `:max_series` - maximum retained tag combinations per metric; defaults to
+  `:infinity`
+- `:on_overflow` - `:drop_new` to ignore new tag combinations, or
+  `:drop_oldest` to evict the oldest retained series; defaults to `:drop_new`
+
+Expired series are pruned when new `last_value` events arrive and when the OTel
+reader observes the metric.
 
 ## Scope
 
@@ -168,6 +209,7 @@ Supported today:
 - `Telemetry.Metrics.Sum`
 - `Telemetry.Metrics.Summary`
 - `Telemetry.Metrics.Distribution`
+- `Telemetry.Metrics.LastValue`
 - backend policy helpers through `OtelBridge.Profile`
 - `:victoria_metrics` profile
 
@@ -176,7 +218,6 @@ Out of scope:
 - tracing APIs
 - logs
 - automatic dashboard generation
-- synchronous support for `Telemetry.Metrics.LastValue`
 
 ## Examples and references
 

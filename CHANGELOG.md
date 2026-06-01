@@ -5,6 +5,22 @@ All notable changes to this project will be documented in this file.
 The format is based on Keep a Changelog and the project follows Semantic
 Versioning.
 
+## [0.2.0] - 2026-06-01
+
+### Added
+
+- added `Telemetry.Metrics.LastValue` support through OpenTelemetry observable
+  gauges
+- added `last_value` cardinality controls: `:ttl_ms`, `:max_series`, and
+  `:on_overflow`
+- expanded docs and the basic example with a bounded queue-depth `last_value`
+  metric
+
+### Changed
+
+- relaxed the `telemetry_metrics` dependency to support both `~> 0.6` and
+  `~> 1.0`
+
 ## [0.1.2] - 2026-05-30
 
 ### Changed

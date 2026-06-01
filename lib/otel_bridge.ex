@@ -115,11 +115,40 @@ defmodule OtelBridge do
     * `Telemetry.Metrics.Sum` -> counter
     * `Telemetry.Metrics.Summary` -> histogram
     * `Telemetry.Metrics.Distribution` -> histogram
+    * `Telemetry.Metrics.LastValue` -> observable gauge
 
   During that process, the bridge groups metrics by event name, extracts the
   measurement value from telemetry events, applies any `keep` filter, derives
   tags through `tag_values`, and carries over unit, description, and explicit
   OTel reporter options.
+
+  `Telemetry.Metrics.LastValue` uses a latest-value store between telemetry
+  events and OpenTelemetry collection. Events update the stored value for a
+  `{metric_name, tags}` series, then the OpenTelemetry reader observes the
+  current value through an observable gauge callback.
+
+  Use `reporter_options[:otel][:last_value]` to bound gauge cardinality:
+
+      last_value("queue.depth",
+        event_name: [:my_app, :queue, :stats],
+        measurement: :depth,
+        tags: [:queue],
+        reporter_options: [
+          otel: [
+            last_value: [
+              ttl_ms: 300_000,
+              max_series: 1_000,
+              on_overflow: :drop_new
+            ]
+          ]
+        ]
+      )
+
+  Supported `:last_value` options are:
+
+    * `:ttl_ms` - stale series age in milliseconds, or `:infinity`
+    * `:max_series` - maximum retained tag combinations per metric, or `:infinity`
+    * `:on_overflow` - `:drop_new` or `:drop_oldest`
 
   ## Runtime options
 
@@ -131,9 +160,8 @@ defmodule OtelBridge do
     * `:poller` - `:telemetry_poller` options such as polling period
     * `:observer_children` - extra children for gauge-like or observable metrics
 
-  Metrics such as `Telemetry.Metrics.LastValue` are intentionally left out of
-  the default bridge path and should be handled with observers or custom
-  runtime logic.
+  Keep `LastValue` tags low-cardinality, or configure `:ttl_ms` and
+  `:max_series` to avoid unbounded retained series.
   """
 
   @typedoc """
@@ -170,11 +198,9 @@ defmodule OtelBridge do
   end
 
   @doc """
-  Filters a list of `Telemetry.Metrics` definitions down to the metric shapes
-  handled by the bridge runtime.
+  Prepares a list of `Telemetry.Metrics` definitions for the bridge runtime.
 
-  Today this excludes shapes such as `Telemetry.Metrics.LastValue`, which are
-  expected to be implemented through observers or custom handling.
+  This keeps supported metric shapes, including `Telemetry.Metrics.LastValue`.
   """
   @spec prepare_metrics([Telemetry.Metrics.t()]) :: [Telemetry.Metrics.t()]
   def prepare_metrics(metrics) do

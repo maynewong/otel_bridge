@@ -1,7 +1,7 @@
 defmodule OtelBridge.MixProject do
   use Mix.Project
 
-  @version "0.1.2"
+  @version "0.2.0"
   @description "Bridge Telemetry.Metrics definitions into OpenTelemetry metrics"
   @source_url "https://github.com/maynewong/otel_bridge"
 
@@ -27,7 +27,7 @@ defmodule OtelBridge.MixProject do
   defp deps do
     [
       {:telemetry, "~> 1.0"},
-      {:telemetry_metrics, "~> 0.6"},
+      {:telemetry_metrics, "~> 0.6 or ~> 1.0"},
       {:telemetry_poller, "~> 1.0"},
       {:opentelemetry, "~> 1.7"},
       {:opentelemetry_exporter, "~> 1.10"},
