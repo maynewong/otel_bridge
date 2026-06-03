@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on Keep a Changelog and the project follows Semantic
 Versioning.
 
+## [0.2.1] - 2026-06-02
+
+### Fixed
+
+- ignored stale ETS table references while recording `last_value` metrics so
+  old telemetry handlers do not crash and detach after a bridge restart
+
 ## [0.2.0] - 2026-06-01
 
 ### Added

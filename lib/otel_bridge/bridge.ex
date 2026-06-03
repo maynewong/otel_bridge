@@ -227,6 +227,8 @@ defmodule OtelBridge.Bridge do
     end
 
     :ok
+  rescue
+    ArgumentError -> :ok
   end
 
   defp instrument_opts(metric) do

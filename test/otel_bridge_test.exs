@@ -129,10 +129,31 @@ defmodule OtelBridgeTest do
       %{metrics: [{metric, instrument}]}
     )
 
-    assert [{30, %{queue: "default"}}] =
-             OtelBridge.Bridge.observe_last_value(table, :queue_depth)
+    assert [{30, %{queue: "default"}}] = OtelBridge.Bridge.observe_last_value(table, :queue_depth)
 
     :ets.delete(table)
+  end
+
+  test "last_value metrics ignore stale ETS table references" do
+    table = :ets.new(:otel_bridge_last_value_stale_table_test, [:set, :public])
+
+    metric =
+      last_value("vm.memory.total",
+        event_name: [:otel_bridge, :stale_last_value],
+        measurement: :total
+      )
+
+    instrument = {:last_value, table, :vm_memory_total}
+
+    :ets.delete(table)
+
+    assert :ok =
+             OtelBridge.Bridge.handle_event(
+               [:otel_bridge, :stale_last_value],
+               %{total: 100},
+               %{},
+               %{metrics: [{metric, instrument}]}
+             )
   end
 
   test "loads metrics from spec modules with caller meta through the public api" do
