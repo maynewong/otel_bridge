@@ -5,6 +5,22 @@ All notable changes to this project will be documented in this file.
 The format is based on Keep a Changelog and the project follows Semantic
 Versioning.
 
+## [0.2.2] - 2026-06-09
+
+### Added
+
+- added finite HTTP request and connection timeouts for OTLP metrics export
+- added support for `OTEL_EXPORTER_OTLP_TIMEOUT` and
+  `OTEL_EXPORTER_OTLP_METRICS_TIMEOUT`
+
+### Fixed
+
+- aligned the default OTLP export timeout with the standard `10_000`
+  millisecond value
+- treated a timeout value of `0` as no limit and ignored invalid environment
+  values with a warning instead of failing exporter initialization
+- capped the HTTP connection timeout at the total export timeout
+
 ## [0.2.1] - 2026-06-02
 
 ### Fixed

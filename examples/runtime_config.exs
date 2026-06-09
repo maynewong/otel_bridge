@@ -2,6 +2,8 @@ import Config
 
 config :opentelemetry_experimental,
   readers: [
+    # OTEL_EXPORTER_OTLP_METRICS_TIMEOUT and OTEL_EXPORTER_OTLP_TIMEOUT are
+    # applied automatically by OtelBridge.Exporter.
     OtelBridge.metric_reader!(:victoria_metrics,
       export_interval_ms: 5_000,
       endpoint:

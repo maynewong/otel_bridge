@@ -1,9 +1,26 @@
 defmodule OtelBridgeTest do
   use ExUnit.Case
 
+  import ExUnit.CaptureLog
   import Telemetry.Metrics
 
   doctest OtelBridge
+
+  @timeout_env_vars ["OTEL_EXPORTER_OTLP_TIMEOUT", "OTEL_EXPORTER_OTLP_METRICS_TIMEOUT"]
+
+  setup do
+    previous_env = Map.new(@timeout_env_vars, &{&1, System.get_env(&1)})
+    Enum.each(@timeout_env_vars, &System.delete_env/1)
+
+    on_exit(fn ->
+      Enum.each(previous_env, fn
+        {name, nil} -> System.delete_env(name)
+        {name, value} -> System.put_env(name, value)
+      end)
+    end)
+
+    :ok
+  end
 
   defmodule DemoSpec do
     use OtelBridge.Spec
@@ -196,5 +213,111 @@ defmodule OtelBridgeTest do
                export_interval_ms: 5_000,
                endpoint: "http://localhost:4318"
              )
+  end
+
+  test "victoriametrics profile leaves OTLP timeout defaults to the exporter" do
+    assert %{
+             config: %{
+               exporter: {OtelBridge.Exporter, exporter_opts}
+             }
+           } =
+             OtelBridge.metric_reader!(
+               :victoria_metrics,
+               export_interval_ms: 5_000,
+               endpoint: "http://localhost:4318"
+             )
+
+    refute Map.has_key?(exporter_opts, :timeout_ms)
+    refute Map.has_key?(exporter_opts, :connect_timeout_ms)
+  end
+
+  test "exporter uses the OTLP default timeout" do
+    assert {:ok,
+            %{
+              timeout_ms: 10_000,
+              connect_timeout_ms: 5_000
+            }} =
+             OtelBridge.Exporter.init(%{
+               endpoints: ["http://localhost:4318"],
+               protocol: :http_protobuf
+             })
+  end
+
+  test "exporter caps the default connection timeout at the configured OTLP timeout" do
+    assert {:ok,
+            %{
+              timeout_ms: 1_000,
+              connect_timeout_ms: 1_000
+            }} =
+             OtelBridge.Exporter.init(%{
+               endpoints: ["http://localhost:4318"],
+               protocol: :http_protobuf,
+               timeout_ms: 1_000
+             })
+  end
+
+  test "exporter treats a zero OTLP timeout as no limit" do
+    with_env("OTEL_EXPORTER_OTLP_METRICS_TIMEOUT", "0", fn ->
+      assert {:ok, %{timeout_ms: :infinity, connect_timeout_ms: :infinity}} =
+               OtelBridge.Exporter.init(%{
+                 endpoints: ["http://localhost:4318"],
+                 protocol: :http_protobuf
+               })
+    end)
+  end
+
+  test "exporter ignores an invalid OTLP timeout environment variable" do
+    log =
+      capture_log(fn ->
+        with_env("OTEL_EXPORTER_OTLP_METRICS_TIMEOUT", "invalid", fn ->
+          assert {:ok, %{timeout_ms: 10_000, connect_timeout_ms: 5_000}} =
+                   OtelBridge.Exporter.init(%{
+                     endpoints: ["http://localhost:4318"],
+                     protocol: :http_protobuf
+                   })
+        end)
+      end)
+
+    assert log =~ "OTEL_EXPORTER_OTLP_METRICS_TIMEOUT"
+    assert log =~ "ignoring"
+  end
+
+  test "exporter ignores a negative OTLP timeout environment variable" do
+    log =
+      capture_log(fn ->
+        with_env("OTEL_EXPORTER_OTLP_METRICS_TIMEOUT", "-1", fn ->
+          assert {:ok, %{timeout_ms: 10_000, connect_timeout_ms: 5_000}} =
+                   OtelBridge.Exporter.init(%{
+                     endpoints: ["http://localhost:4318"],
+                     protocol: :http_protobuf
+                   })
+        end)
+      end)
+
+    assert log =~ "OTEL_EXPORTER_OTLP_METRICS_TIMEOUT"
+    assert log =~ "ignoring"
+  end
+
+  test "metrics-specific OTLP timeout takes precedence over the generic timeout" do
+    with_env("OTEL_EXPORTER_OTLP_TIMEOUT", "8000", fn ->
+      with_env("OTEL_EXPORTER_OTLP_METRICS_TIMEOUT", "2000", fn ->
+        assert {:ok, %{timeout_ms: 2_000, connect_timeout_ms: 2_000}} =
+                 OtelBridge.Exporter.init(%{
+                   endpoints: ["http://localhost:4318"],
+                   protocol: :http_protobuf
+                 })
+      end)
+    end)
+  end
+
+  defp with_env(name, value, fun) do
+    previous = System.get_env(name)
+    System.put_env(name, value)
+
+    try do
+      fun.()
+    after
+      if previous, do: System.put_env(name, previous), else: System.delete_env(name)
+    end
   end
 end

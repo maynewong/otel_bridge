@@ -1,7 +1,7 @@
 defmodule OtelBridge.MixProject do
   use Mix.Project
 
-  @version "0.2.1"
+  @version "0.2.2"
   @description "Bridge Telemetry.Metrics definitions into OpenTelemetry metrics"
   @source_url "https://github.com/maynewong/otel_bridge"
 

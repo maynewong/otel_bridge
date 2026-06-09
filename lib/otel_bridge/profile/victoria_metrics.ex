@@ -9,6 +9,10 @@ defmodule OtelBridge.Profile.VictoriaMetrics do
   histograms to align with VictoriaMetrics and Prometheus-style query
   expectations.
 
+  For HTTP protobuf exports, the profile supports `:timeout_ms` and
+  `:connect_timeout_ms`. Standard OTLP timeout environment variables are applied
+  by `OtelBridge.Exporter` and take precedence over profile options.
+
   ## Typical usage
 
       config :opentelemetry_experimental,
@@ -44,23 +48,26 @@ defmodule OtelBridge.Profile.VictoriaMetrics do
   Optional options:
 
     * `:protocol` - defaults to `:http_protobuf`
+    * `:timeout_ms` - HTTP export timeout; defaults to the OTLP standard of
+      `10_000`, and `0` means no limit
+    * `:connect_timeout_ms` - defaults to `5_000`, capped by `:timeout_ms`; a
+      no-limit OTLP timeout also removes the default connection limit
   """
   def metric_reader(opts) do
     export_interval_ms = Keyword.fetch!(opts, :export_interval_ms)
     endpoint = Keyword.fetch!(opts, :endpoint)
     protocol = Keyword.get(opts, :protocol, :http_protobuf)
 
+    exporter_opts =
+      %{endpoints: [endpoint], protocol: protocol}
+      |> Map.merge(Map.new(Keyword.take(opts, [:timeout_ms, :connect_timeout_ms])))
+
     %{
       module: :otel_metric_reader,
       config: %{
         export_interval_ms: export_interval_ms,
         default_temporality_mapping: @default_temporality_mapping,
-        exporter:
-          {OtelBridge.Exporter,
-           %{
-             endpoints: [endpoint],
-             protocol: protocol
-           }}
+        exporter: {OtelBridge.Exporter, exporter_opts}
       }
     }
   end

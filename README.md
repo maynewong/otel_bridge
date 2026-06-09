@@ -56,7 +56,7 @@ Add `otel_bridge` to your dependencies:
 ```elixir
 def deps do
   [
-    {:otel_bridge, "~> 0.1.2"}
+    {:otel_bridge, "~> 0.2.2"}
   ]
 end
 ```
@@ -135,6 +135,25 @@ config :opentelemetry_experimental,
     )
   ]
 ```
+
+The VictoriaMetrics profile uses the standard OTLP HTTP export timeout of
+`10_000` milliseconds. You can set an application-level value in the profile:
+
+```elixir
+OtelBridge.metric_reader!(:victoria_metrics,
+  export_interval_ms: 5_000,
+  endpoint: "http://localhost:4318",
+  timeout_ms: 15_000,
+  connect_timeout_ms: 5_000
+)
+```
+
+The HTTP exporter also reads the standard environment variables
+`OTEL_EXPORTER_OTLP_METRICS_TIMEOUT` and `OTEL_EXPORTER_OTLP_TIMEOUT`, in that
+order of precedence. Environment variables override profile options. Timeout
+values are milliseconds; `0` means no timeout. Invalid or negative environment
+values are logged and ignored. The connection timeout defaults to `5_000`
+milliseconds and never exceeds the total export timeout.
 
 You can also configure the reader yourself and use `otel_bridge` only for
 metrics bridging.
@@ -238,5 +257,3 @@ Useful modules:
 - `OtelBridge.Profile.VictoriaMetrics` - the built-in backend profile
 
 See [`CHANGELOG.md`](./CHANGELOG.md) for release history.
-
-
