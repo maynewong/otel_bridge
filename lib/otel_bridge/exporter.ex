@@ -130,7 +130,7 @@ defmodule OtelBridge.Exporter do
   defp export_http(address, headers, body, compression, ssl_options, httpc_profile, state) do
     {headers, body} =
       case compression do
-        :gzip -> {[{"content-encoding", "gzip"} | headers], :zlib.gzip(body)}
+        :gzip -> {[{~c"content-encoding", ~c"gzip"} | headers], :zlib.gzip(body)}
         _compression -> {headers, body}
       end
 
@@ -142,7 +142,7 @@ defmodule OtelBridge.Exporter do
 
     case :httpc.request(
            :post,
-           {address, headers, "application/x-protobuf", body},
+           {address, headers, ~c"application/x-protobuf", body},
            http_options,
            [],
            httpc_profile

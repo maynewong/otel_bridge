@@ -3,10 +3,34 @@ defmodule OtelBridgeTest do
 
   import ExUnit.CaptureLog
   import Telemetry.Metrics
+  require Record
 
   doctest OtelBridge
 
   @timeout_env_vars ["OTEL_EXPORTER_OTLP_TIMEOUT", "OTEL_EXPORTER_OTLP_METRICS_TIMEOUT"]
+
+  Record.defrecordp(
+    :datapoint,
+    Record.extract(:datapoint, from_lib: "opentelemetry_experimental/include/otel_metrics.hrl")
+  )
+
+  Record.defrecordp(
+    :metric,
+    Record.extract(:metric, from_lib: "opentelemetry_experimental/include/otel_metrics.hrl")
+  )
+
+  Record.defrecordp(
+    :instrumentation_scope,
+    Record.extract(:instrumentation_scope,
+      from_lib: "opentelemetry_api/include/opentelemetry.hrl"
+    )
+  )
+
+  Record.defrecordp(
+    :metric_sum,
+    :sum,
+    Record.extract(:sum, from_lib: "opentelemetry_experimental/include/otel_metrics.hrl")
+  )
 
   setup do
     previous_env = Map.new(@timeout_env_vars, &{&1, System.get_env(&1)})
@@ -310,6 +334,19 @@ defmodule OtelBridgeTest do
     end)
   end
 
+  test "HTTP protobuf metrics export sends a valid content type" do
+    assert {:ok, request} = export_to_local_collector()
+
+    assert request =~ "content-type: application/x-protobuf\r\n"
+  end
+
+  test "gzip HTTP protobuf metrics export sends a valid content encoding" do
+    assert {:ok, request} = export_to_local_collector(compression: :gzip)
+
+    assert request =~ "content-type: application/x-protobuf\r\n"
+    assert request =~ "content-encoding: gzip\r\n"
+  end
+
   defp with_env(name, value, fun) do
     previous = System.get_env(name)
     System.put_env(name, value)
@@ -319,5 +356,119 @@ defmodule OtelBridgeTest do
     after
       if previous, do: System.put_env(name, previous), else: System.delete_env(name)
     end
+  end
+
+  defp export_to_local_collector(opts \\ []) do
+    {:ok, listen_socket} =
+      :gen_tcp.listen(0, [:binary, active: false, reuseaddr: true, packet: :raw])
+
+    {:ok, port} = :inet.port(listen_socket)
+    parent = self()
+
+    server =
+      spawn_link(fn ->
+        {:ok, socket} = :gen_tcp.accept(listen_socket)
+        {:ok, request} = recv_http_request(socket, <<>>)
+        :ok = :gen_tcp.send(socket, "HTTP/1.1 200 OK\r\ncontent-length: 0\r\n\r\n")
+        send(parent, {:collector_request, request})
+        :gen_tcp.close(socket)
+        :gen_tcp.close(listen_socket)
+      end)
+
+    exporter_opts =
+      %{
+        endpoints: ["http://127.0.0.1:#{port}"],
+        protocol: :http_protobuf
+      }
+      |> Map.merge(Map.new(opts))
+
+    with {:ok, state} <- OtelBridge.Exporter.init(exporter_opts),
+         :ok <- OtelBridge.Exporter.export(sample_metrics(), sample_resource(), state) do
+      receive do
+        {:collector_request, request} -> {:ok, request}
+      after
+        1_000 ->
+          Process.exit(server, :kill)
+          {:error, :collector_timeout}
+      end
+    end
+  end
+
+  defp recv_http_request(socket, buffer) do
+    with {:ok, headers_end} <- find_headers_end(buffer),
+         {:ok, content_length} <- content_length(buffer, headers_end) do
+      request_length = headers_end + content_length
+
+      if byte_size(buffer) >= request_length do
+        {:ok, binary_part(buffer, 0, request_length)}
+      else
+        recv_more(socket, buffer)
+      end
+    else
+      :more -> recv_more(socket, buffer)
+    end
+  end
+
+  defp recv_more(socket, buffer) do
+    case :gen_tcp.recv(socket, 0, 1_000) do
+      {:ok, data} -> recv_http_request(socket, buffer <> data)
+      error -> error
+    end
+  end
+
+  defp find_headers_end(buffer) do
+    case :binary.match(buffer, "\r\n\r\n") do
+      {index, 4} -> {:ok, index + 4}
+      :nomatch -> :more
+    end
+  end
+
+  defp content_length(buffer, headers_end) do
+    headers =
+      buffer
+      |> binary_part(0, headers_end)
+      |> String.downcase()
+
+    case Regex.run(~r/content-length:\s*(\d+)/, headers) do
+      [_, content_length] -> {:ok, String.to_integer(content_length)}
+      nil -> {:ok, 0}
+    end
+  end
+
+  defp sample_metrics do
+    now = :opentelemetry.timestamp()
+
+    [
+      metric(
+        name: "test.counter",
+        scope:
+          instrumentation_scope(
+            name: "otel_bridge_test",
+            version: "",
+            schema_url: :undefined
+          ),
+        description: "",
+        unit: "1",
+        data:
+          metric_sum(
+            aggregation_temporality: :temporality_cumulative,
+            is_monotonic: true,
+            datapoints: [
+              datapoint(
+                attributes: %{},
+                start_time: now,
+                time: now,
+                value: 1,
+                exemplars: [],
+                flags: 0
+              )
+            ]
+          )
+      )
+    ]
+  end
+
+  defp sample_resource do
+    :otel_resource.create([])
   end
 end
