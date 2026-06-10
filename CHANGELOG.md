@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on Keep a Changelog and the project follows Semantic
 Versioning.
 
+## [0.2.3] - 2026-06-10
+
+### Fixed
+
+- fixed HTTP protobuf metrics export request types so `:httpc` accepts the
+  OTLP `Content-Type` and gzip `Content-Encoding` fields
+
 ## [0.2.2] - 2026-06-09
 
 ### Added

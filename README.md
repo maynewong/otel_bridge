@@ -56,7 +56,7 @@ Add `otel_bridge` to your dependencies:
 ```elixir
 def deps do
   [
-    {:otel_bridge, "~> 0.2.2"}
+    {:otel_bridge, "~> 0.2.3"}
   ]
 end
 ```
